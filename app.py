@@ -5,7 +5,7 @@ from openai import OpenAI
 import json
 
 # Прямой ввод ключа
-client = OpenAI(api_key="OPENAI_API_KEY")
+client = OpenAI(api_key="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")
 
 # Настройка страницы
 st.set_page_config(page_title="Conflict Resolver Pro", layout="wide")
@@ -110,3 +110,4 @@ if st.session_state.step == 4:
     if st.button("Начать заново"):
         st.session_state.step = 0
         st.rerun()
+
