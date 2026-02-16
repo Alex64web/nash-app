@@ -33,9 +33,13 @@ elif st.session_state.step == 'input':
         if problem:
             with st.spinner("ChatGPT вычисляет..."):
                 try:
+                    # ... внутри блока обработки нажатия кнопки ...
                     response = client.chat.completions.create(
                         model="gpt-4o-mini",
-                        messages=[{"role": "user", "content": f"Ситуация: {problem}. Создай игру 2x2. Ответь ТОЛЬКО JSON: {{\"s1\":\"Стр1\",\"s2\":\"Стр2\",\"m\":[[\"(10,10)\",\"(0,15)\"],[\"(15,0)\",\"(5,5)\"]],\"nash\":\"описание\"}}"}],
+                        messages=[
+                            {"role": "system", "content": "Ты эксперт по теории игр. Отвечай ТОЛЬКО на русском языке в формате JSON."},
+                            {"role": "user", "content": f"Ситуация: {problem}. Создай игру 2x2. Ответь JSON: {{\"s1\":\"Стр1\",\"s2\":\"Стр2\",\"m\":[[\"(10,10)\",\"(0,15)\"],[\"(15,0)\",\"(5,5)\"]],\"nash\":\"описание\"}}"}
+                        ],
                         response_format={ "type": "json_object" }
                     )
                     st.session_state.data = json.loads(response.choices[0].message.content)
@@ -51,3 +55,4 @@ elif st.session_state.step == 'result':
     if st.button("В НАЧАЛО"):
         st.session_state.step = 'welcome'
         st.rerun()
+
