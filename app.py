@@ -6,7 +6,7 @@ import json
 import re
 
 # Прямой ввод ключа (как мы договорились, это самый быстрый путь)
-client = OpenAI(api_key="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")
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 # Настройка страницы
 st.set_page_config(page_title="Conflict Resolver Pro", layout="wide")
@@ -65,7 +65,7 @@ if col3.button("💎 ПАРЕТО ОПТИМУМ"):
         if res: st.success(res.get('analysis', 'Ошибка анализа'))
 
 # Основная логика игры
-if st.session_state.step > 0 and st.session_state.step <= 6:
+if st.session_state.step > 0 and st.session_state.step <= 3:
     if st.session_state.game_data and 'options' in st.session_state.game_data:
         st.divider()
         st.subheader(f"Этап {st.session_state.step} из 6")
