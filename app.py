@@ -140,3 +140,4 @@ if st.session_state.step == 4:
     if st.button("Начать заново"):
         st.session_state.step = 0
         st.rerun()
+        //
