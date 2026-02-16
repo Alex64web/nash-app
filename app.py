@@ -5,7 +5,7 @@ from openai import OpenAI
 import json
 
 # Настройка клиента
-client = OpenAI(api_key=st.secrets["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"])
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 # Стили
 st.set_page_config(page_title="Conflict Resolver Pro", layout="wide")
@@ -108,3 +108,4 @@ if st.session_state.step == 7:
     if st.button("СБРОС"):
         st.session_state.step = 0
         st.rerun()
+
