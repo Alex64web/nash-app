@@ -3,17 +3,18 @@ import pandas as pd
 import plotly.graph_objects as go
 from openai import OpenAI
 import json
+import re
 
-# Настройка клиента
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+# Прямой ввод ключа (как мы договорились, это самый быстрый путь)
+client = OpenAI(api_key="ТВОЙ_КЛЮЧ_ОТСЮДА")
 
-# Стили
+# Настройка страницы
 st.set_page_config(page_title="Conflict Resolver Pro", layout="wide")
 st.markdown("""
     <style>
     .stApp { background-color: #F5F5DC; }
-    h1, h2, h3, p, label { color: #2C3E50 !important; }
-    .stButton>button { background-color: #4682B4 !important; color: white !important; border-radius: 8px; }
+    h1, h2, h3, p, label, .stMarkdown { color: #2C3E50 !important; }
+    .stButton>button { background-color: #4682B4 !important; color: white !important; border-radius: 8px; width: 100%; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -26,86 +27,88 @@ def get_ai_response(prompt):
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[{"role": "system", "content": "Ты эксперт по теории игр и геополитике. Отвечай только JSON."},
-                      {"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": "Ты эксперт по теории игр. Отвечай ТОЛЬКО в формате JSON. Не пиши лишнего текста до или после JSON."},
+                {"role": "user", "content": prompt}
+            ],
             response_format={ "type": "json_object" }
         )
-        return json.loads(response.choices[0].message.content)
+        content = response.choices[0].message.content
+        return json.loads(content)
     except Exception as e:
-        st.error(f"Ошибка ИИ: {e}")
+        st.error(f"Ошибка связи с ИИ: {e}")
         return None
 
-# --- ЗАГОЛОВОК ---
 st.title("🕊️ Conflict Analytics: Nash & Pareto")
 
-# --- ПАНЕЛЬ ВВОДА ---
-problem = st.text_area("Опишите конфликт (страны, логистика, ресурсы):", placeholder="Например: Спор двух стран за пролив и торговые пути...")
+problem = st.text_area("Опишите конфликт (страны, логистика, ресурсы):", 
+                       placeholder="Например: Спор из-за обиды ребенка или территориальный конфликт...")
 
 col1, col2, col3 = st.columns(3)
 
-# КНОПКА 1: ИГРА (6 ЭТАПОВ)
 if col1.button("🎮 НАЧАТЬ ИГРУ"):
-    prompt = f"Ситуация: {problem}. Создай пошаговую игру на 6 этапов. Для текущего этапа 1 дай 2 варианта выбора для Игрока 1. Один ведет к Равновесию Нэша, другой нет. Опиши последствия для логистики. Ответ JSON: {{'stage':1, 'options':[{{'text':'вариант1','is_nash':true, 'impact':[8,4]}}, {{'text':'вариант2','is_nash':false, 'impact':[2,9]}}]}}"
-    st.session_state.game_data = get_ai_response(prompt)
     st.session_state.step = 1
     st.session_state.history = []
+    with st.spinner("Загрузка этапа 1..."):
+        prompt = f"Ситуация: {problem}. Этап 1 из 6. Дай 2 варианта выбора. Один - равновесие Нэша, другой - нет. JSON формат: {{'stage':1, 'options':[{{'text':'вариант1','is_nash':true, 'impact':[8,4]}}, {{'text':'вариант2','is_nash':false, 'impact':[2,9]}}]}}"
+        st.session_state.game_data = get_ai_response(prompt)
+    st.rerun()
 
-# КНОПКА 2: РАВНОВЕСИЕ НЭША
 if col2.button("📊 РАВНОВЕСИЕ НЭША"):
-    res = get_ai_response(f"Дай подробный анализ Равновесия Нэша для: {problem}. Ответ JSON: {{'analysis':'текст'}}")
-    st.info(res['analysis'])
+    with st.spinner("Анализ Нэша..."):
+        res = get_ai_response(f"Дай подробный анализ Равновесия Нэша для: {problem}. Ответ JSON: {{'analysis':'текст'}}")
+        if res: st.info(res.get('analysis', 'Ошибка анализа'))
 
-# КНОПКА 3: ПАРЕТО ОПТИМУМ
 if col3.button("💎 ПАРЕТО ОПТИМУМ"):
-    res = get_ai_response(f"Найди Парето-оптимальное решение для: {problem}. Ответ JSON: {{'analysis':'текст'}}")
-    st.success(res['analysis'])
+    with st.spinner("Поиск Парето..."):
+        res = get_ai_response(f"Найди Парето-оптимальное решение для: {problem}. Ответ JSON: {{'analysis':'текст'}}")
+        if res: st.success(res.get('analysis', 'Ошибка анализа'))
 
-# --- ИГРОВОЙ ПРОЦЕСС ---
-if st.session_state.step > 0 and st.session_state.game_data:
-    st.divider()
-    st.subheader(f"Этап {st.session_state.step} из 6")
-    
-    data = st.session_state.game_data
-    opts = data['options']
-    
-    # Выбор игрока
-    for i, opt in enumerate(opts):
-        if st.button(f"Выбрать: {opt['text']}", key=f"opt_{i}"):
-            # Логика комментария
-            comment = "✅ Это Равновесие Нэша!" if opt['is_nash'] else "❌ Это не Равновесие (рискованный или невыгодный шаг)."
-            st.session_state.history.append({'step': st.session_state.step, 'impact': opt['impact'], 'comment': comment})
-            
-            if st.session_state.step < 6:
-                st.session_state.step += 1
-                # Загружаем следующий этап
-                st.session_state.game_data = get_ai_response(f"Ситуация: {problem}. Предыдущий шаг был {opt['text']}. Дай 2 варианта для этапа {st.session_state.step}...")
-                st.rerun()
-            else:
-                st.session_state.step = 7 # Конец
+# Основная логика игры
+if st.session_state.step > 0 and st.session_state.step <= 6:
+    if st.session_state.game_data and 'options' in st.session_state.game_data:
+        st.divider()
+        st.subheader(f"Этап {st.session_state.step} из 6")
+        
+        opts = st.session_state.game_data['options']
+        
+        c1, c2 = st.columns(2)
+        for i, opt in enumerate(opts):
+            with [c1, c2][i]:
+                if st.button(opt['text'], key=f"btn_{st.session_state.step}_{i}"):
+                    comment = "✅ Это Равновесие Нэша!" if opt['is_nash'] else "❌ Это не Равновесие."
+                    st.session_state.history.append({'step': st.session_state.step, 'impact': opt['impact'], 'comment': comment})
+                    
+                    if st.session_state.step < 6:
+                        st.session_state.step += 1
+                        with st.spinner(f"Подготовка этапа {st.session_state.step}..."):
+                            new_prompt = f"Ситуация: {problem}. Мы на этапе {st.session_state.step} из 6. Предыдущий выбор: {opt['text']}. Дай новые 2 варианта в формате JSON: {{'options':[{{'text':'...','is_nash':true, 'impact':[5,5]}}, ...]}}"
+                            st.session_state.game_data = get_ai_response(new_prompt)
+                        st.rerun()
+                    else:
+                        st.session_state.step = 7
+                        st.rerun()
+    else:
+        st.warning("ИИ не смог сгенерировать варианты. Попробуйте нажать кнопку еще раз.")
 
-# --- ГРАФИКИ И АНАЛИЗ ---
+# Графики и финал
 if st.session_state.history:
     st.divider()
-    st.subheader("Анализ динамики конфликта")
-    
-    # Подготовка данных для графика
+    # Отрисовка графика (Plotly)
     steps = [h['step'] for h in st.session_state.history]
-    val1 = [h['impact'][0] for h in st.session_state.history]
-    val2 = [h['impact'][1] for h in st.session_state.history]
+    val_a = [h['impact'][0] for h in st.session_state.history]
+    val_b = [h['impact'][1] for h in st.session_state.history]
     
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=steps, y=val1, name="Ресурс Страны А", line=dict(color='#4682B4', width=4)))
-    fig.add_trace(go.Scatter(x=steps, y=val2, name="Ресурс Страны Б", line=dict(color='#E97451', width=4)))
-    fig.update_layout(title="Изменение ресурсов и логистики", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+    fig.add_trace(go.Scatter(x=steps, y=val_a, name="Игрок А", line=dict(color='#4682B4', width=3)))
+    fig.add_trace(go.Scatter(x=steps, y=val_b, name="Игрок Б", line=dict(color='#E97451', width=3)))
     st.plotly_chart(fig, use_container_width=True)
-    
+
     for h in st.session_state.history:
-        st.write(f"**Шаг {h['step']}:** {h['comment']}")
+        st.write(f"**Этап {h['step']}:** {h['comment']}")
 
 if st.session_state.step == 7:
-    st.balloons()
-    st.success("Игра завершена! Выше представлен полный анализ ваших решений.")
-    if st.button("СБРОС"):
+    st.success("🎉 Анализ завершен! Вы прошли все 6 этапов.")
+    if st.button("Начать заново"):
         st.session_state.step = 0
         st.rerun()
-
